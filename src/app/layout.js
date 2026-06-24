@@ -1,5 +1,6 @@
 import "./globals.css";
 import Script from "next/script";
+import SiteHeader from "../components/SiteHeader";
 
 export const metadata = {
   title: "LinkTo - 스마트 링크 라우터",
@@ -14,7 +15,8 @@ export default function RootLayout({ children }) {
           <div className="glow-blob-1"></div>
           <div className="glow-blob-2"></div>
         </div>
-        {children}
+        <SiteHeader />
+        <div className="site-main">{children}</div>
         <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
       </body>
     </html>

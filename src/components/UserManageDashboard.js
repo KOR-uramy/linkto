@@ -2,7 +2,7 @@
 
 import '../app/admin/admin.css';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { 
   ArrowLeft, 
@@ -23,10 +23,18 @@ import GoogleSignInButton from './GoogleSignInButton';
 import { signInWithGoogleCredential, getStoredUser, signOutUser } from '../lib/auth/google-sign-in';
 import { apiUrl } from '../lib/api';
 import { getAuthHeaders } from '../lib/auth/api-headers';
-import { getStoredCredential } from '../lib/auth/get-stored-credential';
+import { getStoredCredential, hasStoredCredential } from '../lib/auth/get-stored-credential';
 import { fetchAuthenticatedProfile } from '../lib/user-profile-client';
 import { isAuthExpiredStatus } from '../lib/user-slug';
 import { useUserSlug } from '../hooks/use-user-slug';
+import {
+  PARTNER_LINKS_DETECT_MAX,
+  PARTNER_LINKS_CARD_HINT,
+  getPartnerLinksLimitHint,
+  acceptPartnerLinksForCard,
+  clampPartnerLinksForDisplay,
+} from '../config/partner-links';
+import PartnerLinkLabel from './PartnerLinkLabel';
 
 export default function UserManageDashboard() {
   const [user, setUser] = useState(null);
@@ -43,11 +51,15 @@ export default function UserManageDashboard() {
   const [saveStatus, setSaveStatus] = useState('');
   const [urlCopied, setUrlCopied] = useState(false);
   const [showProfilePanel, setShowProfilePanel] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [authVersion, setAuthVersion] = useState(0);
 
   const handleCredentialResponse = async (response) => {
     try {
       const userData = await signInWithGoogleCredential(response.credential);
       setUser(userData);
+      setSessionExpired(false);
+      setAuthVersion((v) => v + 1);
     } catch (e) {
       console.error('Failed to handle Google login response:', e);
       alert('구글 로그인에 실패했습니다. 잠시 후 다시 시도해 주세요.');
@@ -97,6 +109,17 @@ export default function UserManageDashboard() {
   });
 
   // 1. User Session & Data Fetching
+  const refreshSession = useCallback(() => {
+    const stored = getStoredUser();
+    if (stored) {
+      setUser(stored);
+    }
+    if (hasStoredCredential()) {
+      setSessionExpired(false);
+      setAuthVersion((v) => v + 1);
+    }
+  }, []);
+
   useEffect(() => {
     let loggedInUser = null;
     try {
@@ -109,21 +132,43 @@ export default function UserManageDashboard() {
     } finally {
       setAuthReady(true);
     }
-  }, []);
+
+    const onStorage = (event) => {
+      if (
+        event.key === 'linkto_user' ||
+        event.key === 'linkto_google_credential' ||
+        event.key === null
+      ) {
+        refreshSession();
+      }
+    };
+    const onFocus = () => refreshSession();
+
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [refreshSession]);
 
   useEffect(() => {
     if (!user?.sub) return;
+
+    if (!hasStoredCredential()) {
+      setSessionExpired(true);
+      return;
+    }
 
     const fetchData = async () => {
       try {
         const result = await fetchAuthenticatedProfile();
         if (result.ok) {
+          setSessionExpired(false);
           setData(ensureProfileStructure(result.data));
           applyFromServer(result.data?.slug);
         } else if (isAuthExpiredStatus(result.status)) {
-          signOutUser();
-          setUser(null);
-          setData(emptyData());
+          setSessionExpired(true);
         } else {
           setData(emptyData());
         }
@@ -134,11 +179,12 @@ export default function UserManageDashboard() {
     };
 
     fetchData();
-  }, [user?.sub, applyFromServer]);
+  }, [user?.sub, authVersion, applyFromServer]);
 
   const handleLogout = () => {
     signOutUser();
     setUser(null);
+    setSessionExpired(false);
   };
 
   // 3. Save changes helper
@@ -200,7 +246,7 @@ export default function UserManageDashboard() {
 
         let detectedLinks = [];
         if (metadata.detectedLinks?.length > 0) {
-          detectedLinks = metadata.detectedLinks.map((item) => ({
+          detectedLinks = metadata.detectedLinks.slice(0, PARTNER_LINKS_DETECT_MAX).map((item) => ({
             url: item.url,
             label: item.label || '구매 링크',
           }));
@@ -212,12 +258,16 @@ export default function UserManageDashboard() {
           detectedLinks = [{ url: metadata.partnersUrl, label }];
         }
 
+        const { accepted, rejectedCount, detectedTotal } = acceptPartnerLinksForCard(detectedLinks);
+
         setPendingCard({
           title: metadata.title || '영상 링크',
           snsUrl,
           thumbnailUrl: metadata.thumbnailUrl || '',
           platform: metadata.platform || 'general',
-          partnersLinks: detectedLinks,
+          partnersLinks: accepted,
+          rejectedLinkCount: rejectedCount,
+          detectedTotal,
         });
       } else {
         alert('영상 정보를 불러오는 데 실패했습니다.');
@@ -253,7 +303,7 @@ export default function UserManageDashboard() {
         id: 'card-' + Date.now(),
         title: pendingCard.title,
         snsUrl: pendingCard.snsUrl,
-        partnersLinks: pendingCard.partnersLinks.slice(0, 2),
+        partnersLinks: clampPartnerLinksForDisplay(pendingCard.partnersLinks),
         thumbnailUrl: pendingCard.thumbnailUrl,
         platform: pendingCard.platform,
         clicks: 0,
@@ -278,7 +328,9 @@ export default function UserManageDashboard() {
   const handleRemovePartnerLink = (linkId, partnerIndex) => {
     const updatedLinks = data.links.map((link) => {
       if (link.id !== linkId) return link;
-      const nextPartners = (link.partnersLinks || []).filter((_, i) => i !== partnerIndex);
+      const nextPartners = clampPartnerLinksForDisplay(
+        (link.partnersLinks || []).filter((_, i) => i !== partnerIndex)
+      );
       return { ...link, partnersLinks: nextPartners };
     });
     saveData({ ...data, links: updatedLinks });
@@ -432,7 +484,12 @@ export default function UserManageDashboard() {
   return (
     <div className="admin-wrapper fade-in">
       <header className="admin-header">
-        <Link href={publicPath} className="btn-secondary back-btn" target="_blank">
+        <Link
+          href={effectiveSlug ? publicPath : '#'}
+          className="btn-secondary back-btn"
+          aria-disabled={!effectiveSlug}
+          style={!effectiveSlug ? { pointerEvents: 'none', opacity: 0.5 } : undefined}
+        >
           <ArrowLeft size={16} />
           <span>페이지 보기</span>
         </Link>
@@ -443,6 +500,18 @@ export default function UserManageDashboard() {
       </header>
 
       <main className="admin-container">
+
+        {(sessionExpired) && (
+          <section className="login-gate glass-panel" style={{ marginBottom: '16px' }}>
+            <p className="admin-subtitle" style={{ marginBottom: '12px' }}>
+              로그인 세션이 만료되었습니다. 편집·저장을 계속하려면 다시 로그인해 주세요.
+            </p>
+            <GoogleSignInButton
+              containerId="google-signin-btn-manage-reauth"
+              onCredential={handleCredentialResponse}
+            />
+          </section>
+        )}
 
         <div
           className={`user-profile-widget ${showProfilePanel ? 'is-open' : ''}`}
@@ -472,7 +541,12 @@ export default function UserManageDashboard() {
                   {showProfilePanel ? '프로필 · SNS 설정 접기' : '프로필 · SNS 설정 펼치기'}
                 </p>
                 <div className="user-widget-links" onClick={(e) => e.stopPropagation()}>
-                  <Link href={publicPath} className="user-widget-link-btn" target="_blank" style={{ fontSize: '13px' }}>
+                  <Link
+                    href={effectiveSlug ? publicPath : '#'}
+                    className="user-widget-link-btn"
+                    style={{ fontSize: '13px', ...(!effectiveSlug ? { pointerEvents: 'none', opacity: 0.5 } : {}) }}
+                    aria-disabled={!effectiveSlug}
+                  >
                     내 페이지 보기 <ExternalLink size={11} style={{ marginLeft: '1px' }} />
                   </Link>
                   <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>|</span>
@@ -673,6 +747,7 @@ export default function UserManageDashboard() {
                   )}
                 </button>
               </div>
+              <p className="form-hint">{getPartnerLinksLimitHint()}</p>
             </div>
           </form>
 
@@ -686,9 +761,12 @@ export default function UserManageDashboard() {
                 )}
                 <div className="detected-preview-meta">
                   <p className="detected-preview-title">{pendingCard.title}</p>
-                  <p className="detected-preview-sub">
-                    감지된 링크 {pendingCard.partnersLinks.length}개 · 최대 2개까지 카드에 포함됩니다
-                  </p>
+                  <p className="detected-preview-sub">{PARTNER_LINKS_CARD_HINT}</p>
+                  {pendingCard.rejectedLinkCount > 0 && (
+                    <p className="detected-preview-rejected">
+                      감지 {pendingCard.detectedTotal}개 중 {pendingCard.rejectedLinkCount}개는 제외되었습니다
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -700,7 +778,7 @@ export default function UserManageDashboard() {
                         <img src={getFaviconUrl(pl.url)} alt="" className="detected-link-favicon" />
                       )}
                       <div className="detected-link-text">
-                        <span className="detected-link-label">{pl.label}</span>
+                        <PartnerLinkLabel url={pl.url} storedLabel={pl.label} className="detected-link-label" />
                         <span className="detected-link-url">{pl.url}</span>
                       </div>
                       <button
@@ -792,7 +870,7 @@ export default function UserManageDashboard() {
                             <img src={getFaviconUrl(pl.url)} alt="" className="detected-link-favicon" />
                           )}
                           <div className="detected-link-text">
-                            <span className="detected-link-label">{pl.label || '링크'}</span>
+                            <PartnerLinkLabel url={pl.url} storedLabel={pl.label} className="detected-link-label" />
                             <span className="detected-link-url">{pl.url}</span>
                           </div>
                           <button

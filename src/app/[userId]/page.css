@@ -1,7 +1,7 @@
 .page-wrapper {
   width: 100%;
-  min-height: 100vh;
-  padding: 30px 10px 80px 10px;
+  min-height: calc(100vh - 60px);
+  padding: 20px 10px 80px 10px;
   display: flex;
   justify-content: center;
 }

@@ -1,9 +1,9 @@
 'use client';
 
 import './page.css';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { LogOut, LayoutDashboard, Link2, ExternalLink, Copy, Check } from 'lucide-react';
+import { LogOut, LayoutDashboard, Link2, Copy, Check } from 'lucide-react';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import { signInWithGoogleCredential, getStoredUser, signOutUser } from '../lib/auth/google-sign-in';
 import { useUserSlug } from '../hooks/use-user-slug';
@@ -13,14 +13,8 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [urlCopied, setUrlCopied] = useState(false);
 
-  const handleAuthExpired = useCallback(() => {
-    signOutUser();
-    setUser(null);
-  }, []);
-
   const { effectiveSlug, publicPath, publicUrl } = useUserSlug(user, {
     syncFromApi: true,
-    onAuthExpired: handleAuthExpired,
   });
 
   useEffect(() => {
@@ -67,7 +61,6 @@ export default function Home() {
     <div className="landing-wrapper fade-in">
       <main className="landing-container glass-panel">
         <header className="landing-header">
-          <h1 className="landing-logo">LinkTo</h1>
           <p className="landing-tagline">유튜브/SNS 영상 및 제휴 링크를 손쉽게 모으는 나만의 링크 보드</p>
         </header>
 
@@ -108,19 +101,17 @@ export default function Home() {
             <div className="portal-actions">
               <Link href="/manage" className="btn-primary portal-btn">
                 <LayoutDashboard size={18} />
-                <span>내 페이지 관리 (편집하기)</span>
+                <span>내 페이지 관리</span>
               </Link>
 
               <Link
                 href={publicPath}
                 className="btn-secondary portal-btn portal-btn--view"
-                target="_blank"
                 aria-disabled={!effectiveSlug}
                 style={!effectiveSlug ? { pointerEvents: 'none', opacity: 0.5 } : undefined}
               >
                 <Link2 size={18} />
                 <span>나의 공개 링크 페이지 보기</span>
-                <ExternalLink size={14} />
               </Link>
 
               <div className="user-url-display" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

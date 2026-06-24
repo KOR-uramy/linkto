@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { PARTNER_LINKS_DETECT_MAX } from '../../../config/partner-links.js';
+import { fetchPartnerLinkTitle } from '../../../lib/fetch-partner-link-title.js';
 
 // Helper to identify and filter out social media profiles and system/CDN/junk domains
 function isJunkDomain(url) {
@@ -47,6 +49,54 @@ function isJunkDomain(url) {
     return true; // invalid URL is treated as junk
   }
   return false;
+}
+
+function pushUniqueUrl(urlList, url, max = PARTNER_LINKS_DETECT_MAX) {
+  if (urlList.length >= max || isJunkDomain(url) || urlList.includes(url)) {
+    return;
+  }
+  urlList.push(url);
+}
+
+async function buildDetectedLinks(tempUrls) {
+  const urls = tempUrls.slice(0, PARTNER_LINKS_DETECT_MAX);
+  return Promise.all(
+    urls.map(async (url) => {
+      const label = await fetchPartnerLinkTitle(url);
+      return { url, label };
+    })
+  );
+}
+
+function pickPrimaryPartnersUrl(detectedLinks) {
+  if (detectedLinks.length === 0) {
+    return '';
+  }
+
+  const coupang = detectedLinks.find((item) => item.url.includes('link.coupang.com'));
+  if (coupang) {
+    return coupang.url;
+  }
+
+  const amazon = detectedLinks.find(
+    (item) =>
+      item.url.includes('amzn.to') ||
+      item.url.includes('amazon.to') ||
+      item.url.includes('amazon.com')
+  );
+  if (amazon) {
+    return amazon.url;
+  }
+
+  const naver = detectedLinks.find(
+    (item) =>
+      item.url.includes('smartstore.naver.com') || item.url.includes('brand.naver.com')
+  );
+  if (naver) {
+    return naver.url;
+  }
+
+  return detectedLinks[0].url;
 }
 
 const YOUTUBE_FETCH_HEADERS = {
@@ -173,9 +223,9 @@ export async function GET(request) {
                   continue;
                 }
                 
-                // Avoid duplicate URLs in the list
-                if (!tempUrls.includes(url)) {
-                  tempUrls.push(url);
+                pushUniqueUrl(tempUrls, url);
+                if (tempUrls.length >= PARTNER_LINKS_DETECT_MAX) {
+                  break;
                 }
               }
             }
@@ -215,8 +265,9 @@ export async function GET(request) {
                       continue;
                     }
                     
-                    if (!tempUrls.includes(resolvedUrl)) {
-                      tempUrls.push(resolvedUrl);
+                    pushUniqueUrl(tempUrls, resolvedUrl);
+                    if (tempUrls.length >= PARTNER_LINKS_DETECT_MAX) {
+                      break;
                     }
                   }
                 }
@@ -226,32 +277,12 @@ export async function GET(request) {
             }
             }
             
-            // Concurrently fetch page/browser titles for the links (up to 2)
-            const detectedLinks = await Promise.all(
-              tempUrls.slice(0, 2).map(async (url) => {
-                const title = await fetchWebpageTitle(url);
-                return { url, label: title };
-              })
-            );
+            // Concurrently fetch page/browser titles for the links (up to PARTNER_LINKS_DETECT_MAX)
+            const detectedLinks = await buildDetectedLinks(tempUrls);
             
             // Set the primary partnersUrl using priority
             if (detectedLinks.length > 0) {
-              const coupang = detectedLinks.find(item => item.url.includes('link.coupang.com'));
-              if (coupang) {
-                partnersUrl = coupang.url;
-              } else {
-                const amazon = detectedLinks.find(item => item.url.includes('amzn.to') || item.url.includes('amazon.to') || item.url.includes('amazon.com'));
-                if (amazon) {
-                  partnersUrl = amazon.url;
-                } else {
-                  const naver = detectedLinks.find(item => item.url.includes('smartstore.naver.com') || item.url.includes('brand.naver.com'));
-                  if (naver) {
-                    partnersUrl = naver.url;
-                  } else {
-                    partnersUrl = detectedLinks[0].url;
-                  }
-                }
-              }
+              partnersUrl = pickPrimaryPartnersUrl(detectedLinks);
               
               // Also return all detected links
               return NextResponse.json({ 
@@ -318,7 +349,7 @@ export async function GET(request) {
                 const domain = new URL(cleanBioUrl).hostname.toLowerCase();
                 const systemKeywords = ['cdn', 'static', 'ttwstatic', 'secsdk', 'slardar', 'bytedance', 'ibytedtos'];
                 if (!systemKeywords.some(kw => domain.includes(kw))) {
-                  tempUrls.push(cleanBioUrl);
+                  pushUniqueUrl(tempUrls, cleanBioUrl);
                 }
               } catch(e) {}
             } else {
@@ -326,28 +357,16 @@ export async function GET(request) {
               const rawUrls = profileHtml.match(/(https?:\/\/[^\s"'\\]+)/g) || [];
               for (let rawUrl of rawUrls) {
                 let cleanUrl = rawUrl.split(/[?"'\\]/)[0];
-                if (!isJunkDomain(cleanUrl)) {
-                  if (!tempUrls.includes(cleanUrl)) {
-                    tempUrls.push(cleanUrl);
-                  }
+                pushUniqueUrl(tempUrls, cleanUrl);
+                if (tempUrls.length >= PARTNER_LINKS_DETECT_MAX) {
+                  break;
                 }
               }
             }
 
             if (tempUrls.length > 0) {
-              detectedLinks = await Promise.all(
-                tempUrls.slice(0, 2).map(async (url) => {
-                  const title = await fetchWebpageTitle(url);
-                  return { url, label: title };
-                })
-              );
-              
-              const coupang = detectedLinks.find(item => item.url.includes('link.coupang.com'));
-              if (coupang) {
-                partnersUrl = coupang.url;
-              } else {
-                partnersUrl = detectedLinks[0].url;
-              }
+              detectedLinks = await buildDetectedLinks(tempUrls);
+              partnersUrl = pickPrimaryPartnersUrl(detectedLinks);
             }
           }
         }
@@ -445,7 +464,7 @@ export async function GET(request) {
                 const domain = new URL(cleanExtUrl).hostname.toLowerCase();
                 const systemKeywords = ['cdn', 'static', 'ttwstatic', 'secsdk', 'slardar', 'bytedance', 'ibytedtos'];
                 if (!systemKeywords.some(kw => domain.includes(kw))) {
-                  tempUrls.push(cleanExtUrl);
+                  pushUniqueUrl(tempUrls, cleanExtUrl);
                 }
               } catch(e) {}
             } else {
@@ -453,28 +472,16 @@ export async function GET(request) {
               const rawUrls = profileHtml.match(/(https?:\/\/[^\s"'\\]+)/g) || [];
               for (let rawUrl of rawUrls) {
                 let cleanUrl = rawUrl.split(/[?"'\\]/)[0];
-                if (!isJunkDomain(cleanUrl)) {
-                  if (!tempUrls.includes(cleanUrl)) {
-                    tempUrls.push(cleanUrl);
-                  }
+                pushUniqueUrl(tempUrls, cleanUrl);
+                if (tempUrls.length >= PARTNER_LINKS_DETECT_MAX) {
+                  break;
                 }
               }
             }
             
             if (tempUrls.length > 0) {
-              detectedLinks = await Promise.all(
-                tempUrls.slice(0, 2).map(async (url) => {
-                  const title = await fetchWebpageTitle(url);
-                  return { url, label: title };
-                })
-              );
-              
-              const coupang = detectedLinks.find(item => item.url.includes('link.coupang.com'));
-              if (coupang) {
-                partnersUrl = coupang.url;
-              } else {
-                partnersUrl = detectedLinks[0].url;
-              }
+              detectedLinks = await buildDetectedLinks(tempUrls);
+              partnersUrl = pickPrimaryPartnersUrl(detectedLinks);
             }
           }
         }
@@ -499,50 +506,5 @@ export async function GET(request) {
       platform: 'general',
       warning: 'Could not scrape metadata: ' + error.message
     });
-  }
-}
-
-// Helper to fetch target webpage and scrape its title (what shows in the browser tab)
-async function fetchWebpageTitle(url) {
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
-        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
-      },
-      signal: AbortSignal.timeout(5000) // Timeout after 5s to prevent hanging
-    });
-
-    if (response.ok) {
-      const html = await response.text();
-      const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
-      if (titleMatch && titleMatch[1]) {
-        let title = titleMatch[1]
-          .replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/&quot;/g, '"')
-          .replace(/&#39;/g, "'")
-          .trim();
-        
-        // Clean up common suffixes for clean buttons
-        title = title
-          .replace(/\s*-\s*쿠팡!$/i, '')
-          .replace(/\s*:\s*네이버\s*쇼핑$/i, '')
-          .replace(/\s*:\s*네이버\s*스마트스토어$/i, '')
-          .replace(/\s*\|\s*.*$/g, ''); // strip tailing pipes
-        
-        if (title) return title;
-      }
-    }
-  } catch (e) {
-    console.error(`Failed to fetch title for ${url}:`, e);
-  }
-
-  // Fallback to domain name if fetch/title parsing fails
-  try {
-    return new URL(url).hostname.toLowerCase().replace(/^www\./i, '');
-  } catch (e) {
-    return '링크';
   }
 }

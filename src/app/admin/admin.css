@@ -1,8 +1,8 @@
 .admin-wrapper {
   width: 100%;
   max-width: 600px;
-  padding: 40px 20px 80px 20px;
-  min-height: 100vh;
+  padding: 24px 20px 80px 20px;
+  min-height: calc(100vh - 60px);
 }
 
 .admin-header {
@@ -85,6 +85,13 @@
 .form-group {
   display: flex;
   flex-direction: column;
+}
+
+.form-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 6px 0 0 0;
+  line-height: 1.45;
 }
 
 .input-with-action {
@@ -172,6 +179,13 @@
   font-size: 12px;
   color: var(--text-secondary);
   margin: 0;
+}
+
+.detected-preview-rejected {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 4px 0 0 0;
+  opacity: 0.85;
 }
 
 .detected-links-list,

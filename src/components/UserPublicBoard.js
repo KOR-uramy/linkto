@@ -10,6 +10,8 @@ import { syncUserSlug } from '../lib/user-slug';
 import { getAuthHeaders } from '../lib/auth/api-headers';
 import { isOwnerOfHandle } from '../lib/auth/owner-check';
 import { getStoredCredential } from '../lib/auth/get-stored-credential';
+import { clampPartnerLinksForDisplay } from '../config/partner-links';
+import PartnerLinkLabel from './PartnerLinkLabel';
 
 const Youtube = ({ size = 24, ...props }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -492,7 +494,9 @@ export default function UserPublicBoard({ handle }) {
             sortedLinks.map((link) => {
               // Video number should align with the original index from the admin panel (1-based index)
               const registerNum = links.length - links.findIndex(l => l.id === link.id);
-              const activePartners = (link.partnersLinks || []).filter((pl) => pl?.url).slice(0, 2);
+              const activePartners = clampPartnerLinksForDisplay(
+                (link.partnersLinks || []).filter((pl) => pl?.url)
+              );
               const linksCount = activePartners.length > 0
                 ? activePartners.length
                 : (link.partnersUrl ? 1 : 0);
@@ -545,7 +549,7 @@ export default function UserPublicBoard({ handle }) {
                             onClick={() => handleCardClick(link.id)}
                           >
                             <LinkFavicon url={pl.url} />
-                            <span>{pl.label || '구매 링크'}</span>
+                            <PartnerLinkLabel url={pl.url} storedLabel={pl.label} />
                             <ExternalLink size={12} />
                           </a>
                         ))

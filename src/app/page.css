@@ -16,19 +16,11 @@
 }
 
 .landing-header {
-  margin-bottom: 30px;
-}
-
-.landing-logo {
-  font-family: var(--font-handwritten);
-  font-size: 64px;
-  font-weight: 800;
-  margin: 0 0 10px 0;
-  line-height: 1;
+  margin-bottom: 24px;
 }
 
 .landing-tagline {
-  font-size: 15px;
+  font-size: 16px;
   color: var(--text-secondary);
   line-height: 1.5;
   word-break: keep-all;

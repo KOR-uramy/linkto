@@ -44,3 +44,7 @@ if [ -n "$DISTRIBUTION_ID" ]; then
 fi
 
 echo "==> Static deploy done"
+
+if [ -x "$(dirname "$0")/cloudfront/update-function.sh" ]; then
+  bash "$(dirname "$0")/cloudfront/update-function.sh"
+fi

@@ -1,5 +1,6 @@
 import { apiUrl } from '../api';
 import { getAuthHeaders } from './api-headers';
+import { storeCredential, clearStoredCredential } from './get-stored-credential';
 
 const USER_STORAGE_KEY = 'linkto_user';
 
@@ -17,7 +18,7 @@ export async function signInWithGoogleCredential(credential) {
 
   const user = data.user;
   localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-  sessionStorage.setItem('linkto_google_credential', credential);
+  storeCredential(credential);
 
   const loadRes = await fetch(
     apiUrl(
@@ -57,5 +58,5 @@ export function getStoredUser() {
 
 export function signOutUser() {
   localStorage.removeItem(USER_STORAGE_KEY);
-  sessionStorage.removeItem('linkto_google_credential');
+  clearStoredCredential();
 }
