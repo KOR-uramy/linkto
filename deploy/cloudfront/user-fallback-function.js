@@ -2,6 +2,15 @@ function handler(event) {
   var request = event.request;
   var uri = request.uri;
 
+  var reserved = { manage: 1, admin: 1, user: 1, api: 1, _next: 1 };
+
+  // /{slug}/__next.*.txt — RSC flight (HTML과 같이 /user fallback 사용)
+  var slugRsc = uri.match(/^\/([^\/]+)\/(__next\.[^\/]+\.txt|index\.txt)$/);
+  if (slugRsc && !reserved[slugRsc[1]]) {
+    request.uri = '/user/' + slugRsc[2];
+    return request;
+  }
+
   if (uri.indexOf('.') !== -1) {
     return request;
   }

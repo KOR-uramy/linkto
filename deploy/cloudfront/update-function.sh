@@ -35,7 +35,7 @@ if [ -n "$DIST_ID" ]; then
   aws cloudfront create-invalidation \
     --profile "$AWS_PROFILE" \
     --distribution-id "$DIST_ID" \
-    --paths "/manage" "/manage/*" "/admin" "/admin/*" >/dev/null
+    --paths "/manage" "/manage/*" "/admin" "/admin/*" "/user/*" "/*/__next*" >/dev/null
 fi
 
 echo "==> CloudFront function deploy done"
