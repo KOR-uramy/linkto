@@ -1,0 +1,49 @@
+{
+  "profile": {
+    "name": "개발자 테스트",
+    "bio": "유튜브 / SNS 영상 링크와 제휴사 링크를 보기 쉽게 모아두는 나만의 링크 보드입니다.",
+    "avatar": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\" viewBox=\"0 0 100 100\"><rect width=\"100%\" height=\"100%\" fill=\"%23ffd54f\"/><text x=\"50%\" y=\"55%\" font-size=\"36\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%232c2c2c\" dominant-baseline=\"middle\" text-anchor=\"middle\">DEV</text></svg>",
+    "socials": [
+      {
+        "id": "social-1782280587252",
+        "platform": "youtube",
+        "url": "https://www.youtube.com/@Pick_Glow/featured"
+      },
+      {
+        "id": "social-1782280871132",
+        "platform": "tiktok",
+        "url": "https://www.tiktok.com/@ddubi_home_"
+      }
+    ]
+  },
+  "links": [
+    {
+      "id": "card-1782279631774",
+      "title": "👆프로필 링크 <230번>검색🧡 감자전에 부침가루 절대 넣지마세요! #레시피 #집밥레시피 #감자전 #요리꿀팁 #요리 ",
+      "snsUrl": "https://www.tiktok.com/@ddubi_home_/video/7623383250450287892?is_from_webapp=1",
+      "partnersLinks": [
+        {
+          "url": "https://influencers.coupang.com/s/ddubi_home_",
+          "label": "ddubi_home_"
+        }
+      ],
+      "thumbnailUrl": "https://p16-common-sign.tiktokcdn.com/tos-alisg-p-0037/okvICXTPiiAEi5EwIIpBqMjhd5sWlz0LiAhfAr~tplv-tiktokx-origin.image?dr=14575&x-expires=1782450000&x-signature=k3uEuXinRE19N%2FI3%2FnwnpR9ZNXU%3D&t=4d5b0474&ps=13740610&shp=81f88b70&shcp=43f4a2f9&idc=sg1",
+      "platform": "tiktok",
+      "clicks": 0
+    },
+    {
+      "id": "card-1782279505637",
+      "title": "케이스티파이 쿠팡 특가 모음 #shorts",
+      "snsUrl": "https://www.youtube.com/shorts/P7Y4p22aH98",
+      "partnersLinks": [
+        {
+          "url": "https://link.coupang.com/a/eOoKANMkGy",
+          "label": "쿠팡이 추천하는 케이스티파이 관련 혜택과 특가"
+        }
+      ],
+      "thumbnailUrl": "https://img.youtube.com/vi/P7Y4p22aH98/hqdefault.jpg",
+      "platform": "youtube",
+      "clicks": 1
+    }
+  ]
+}
