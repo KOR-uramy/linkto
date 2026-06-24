@@ -3,17 +3,22 @@
 import { useEffect, useState } from 'react';
 import { apiUrl } from '../lib/api';
 import {
-  cleanPartnerLinkLabel,
-  getInitialPartnerLinkLabel,
-  getPartnerLinkFallbackLabel,
+  getPartnerLinkUrlFallback,
+  resolvePartnerLinkDisplayLabel,
 } from '../lib/partner-link-label';
 
+function getDisplayLabel(storedLabel, url, fetchedLabel = '') {
+  return (
+    resolvePartnerLinkDisplayLabel(storedLabel, url, fetchedLabel) ||
+    getPartnerLinkUrlFallback(url)
+  );
+}
+
 export default function PartnerLinkLabel({ url, storedLabel, className = '' }) {
-  const [label, setLabel] = useState(() => getInitialPartnerLinkLabel(storedLabel, url));
+  const [label, setLabel] = useState(() => getDisplayLabel(storedLabel, url));
 
   useEffect(() => {
-    const initial = getInitialPartnerLinkLabel(storedLabel, url);
-    setLabel(initial);
+    setLabel(getDisplayLabel(storedLabel, url));
 
     if (!url) {
       return undefined;
@@ -29,13 +34,12 @@ export default function PartnerLinkLabel({ url, storedLabel, className = '' }) {
         }
 
         const data = await res.json();
-        const fetched = cleanPartnerLinkLabel(data.title, url);
-        const fallback = getPartnerLinkFallbackLabel(url);
-        if (!cancelled && fetched && fetched !== fallback) {
-          setLabel(fetched);
+        const nextLabel = getDisplayLabel(storedLabel, url, data.title || '');
+        if (!cancelled && nextLabel) {
+          setLabel(nextLabel);
         }
       } catch {
-        // stored/fallback label 유지
+        // stored label 유지
       }
     };
 

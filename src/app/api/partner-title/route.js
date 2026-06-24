@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { fetchPartnerLinkTitle } from '../../../lib/fetch-partner-link-title.js';
+import { getPartnerLinkUrlFallback } from '../../../lib/partner-link-label.js';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -16,7 +17,7 @@ export async function GET(request) {
 
   try {
     const title = await fetchPartnerLinkTitle(cleanUrl);
-    return NextResponse.json({ title, url: cleanUrl });
+    return NextResponse.json({ title: title || getPartnerLinkUrlFallback(cleanUrl), url: cleanUrl });
   } catch (error) {
     console.error('Failed to fetch partner link title:', error);
     return NextResponse.json(

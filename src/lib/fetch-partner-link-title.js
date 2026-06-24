@@ -1,4 +1,5 @@
-import { cleanPartnerLinkLabel, getPartnerLinkFallbackLabel } from './partner-link-label.js';
+import { extractPageTitleFromHtml } from './extract-page-title.js';
+import { cleanPartnerLinkLabel, getPartnerLinkUrlFallback } from './partner-link-label.js';
 
 function buildFetchHeaders(url) {
   const headers = {
@@ -23,37 +24,10 @@ function buildFetchHeaders(url) {
   return headers;
 }
 
-function extractRawTitle(html) {
-  return (
-    html.match(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i)?.[1] ||
-    html.match(/<meta\s+name=["']twitter:title["']\s+content=["'](.*?)["']/i)?.[1] ||
-    html.match(/<title[^>]*>(.*?)<\/title>/i)?.[1] ||
-    ''
-  );
-}
-
-/** influencers.coupang.com 스토어프론트 HTML에 포함된 크리에이터 매장명 */
-function extractStorefrontProfileTitle(html) {
-  const patterns = [
-    /"profile"\s*:\s*\{[^}]*"title"\s*:\s*"([^"]+)"/,
-    /\\"profile\\":\{[^}]*\\"title\\":\\"([^\\"]+)\\"/,
-    /storefrontNo\\":\\"[^\\"]+\\"[^}]*\\"title\\":\\"([^\\"]+)\\"/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = html.match(pattern);
-    if (match?.[1]) {
-      return match[1].trim();
-    }
-  }
-
-  return '';
-}
-
-/** 제휴 URL의 브라우저 탭 타이틀을 가져옵니다. */
-export async function fetchPartnerLinkTitle(url) {
+/** 제휴 URL의 실제 페이지 타이틀을 가져옵니다. 실패 시 URL 주소를 반환합니다. */
+export async function fetchPartnerLinkTitle(url, contextLabel = '') {
   if (!url) {
-    return getPartnerLinkFallbackLabel(url);
+    return '';
   }
 
   try {
@@ -65,22 +39,27 @@ export async function fetchPartnerLinkTitle(url) {
 
     if (response.ok) {
       const html = await response.text();
-
-      if (/influencers\.coupang\.com/i.test(url)) {
-        const profileTitle = extractStorefrontProfileTitle(html);
-        if (profileTitle) {
-          return cleanPartnerLinkLabel(profileTitle, url);
-        }
+      const finalUrl = response.url || url;
+      const rawTitle = extractPageTitleFromHtml(html, finalUrl);
+      const cleaned = cleanPartnerLinkLabel(rawTitle, url);
+      if (cleaned) {
+        return cleaned;
       }
-
-      const rawTitle = extractRawTitle(html);
-      if (rawTitle) {
-        return cleanPartnerLinkLabel(rawTitle, url);
-      }
+    } else {
+      console.warn(`Partner link fetch returned ${response.status} for ${url}`);
     }
   } catch (error) {
     console.error(`Failed to fetch partner link title for ${url}:`, error);
   }
 
-  return getPartnerLinkFallbackLabel(url);
+  const context = cleanPartnerLinkLabel(contextLabel, url);
+  return context || getPartnerLinkUrlFallback(url);
+}
+
+/** metadata 감지용 — URL + 설명 맥락 라벨 */
+export async function fetchPartnerLinkTitleWithContext(entry) {
+  const url = typeof entry === 'string' ? entry : entry?.url;
+  const contextLabel = typeof entry === 'string' ? '' : entry?.contextLabel || '';
+  const title = await fetchPartnerLinkTitle(url, contextLabel);
+  return { url, label: title || getPartnerLinkUrlFallback(url) };
 }

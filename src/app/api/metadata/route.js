@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { PARTNER_LINKS_DETECT_MAX } from '../../../config/partner-links.js';
-import { fetchPartnerLinkTitle } from '../../../lib/fetch-partner-link-title.js';
+import { fetchPartnerLinkTitleWithContext } from '../../../lib/fetch-partner-link-title.js';
+import { extractLinkContextLabel } from '../../../lib/extract-link-context-label.js';
 
 // Helper to identify and filter out social media profiles and system/CDN/junk domains
 function isJunkDomain(url) {
@@ -51,21 +52,16 @@ function isJunkDomain(url) {
   return false;
 }
 
-function pushUniqueUrl(urlList, url, max = PARTNER_LINKS_DETECT_MAX) {
-  if (urlList.length >= max || isJunkDomain(url) || urlList.includes(url)) {
+function pushUniqueLink(linkList, url, contextLabel = '', max = PARTNER_LINKS_DETECT_MAX) {
+  if (linkList.length >= max || isJunkDomain(url) || linkList.some((item) => item.url === url)) {
     return;
   }
-  urlList.push(url);
+  linkList.push({ url, contextLabel });
 }
 
-async function buildDetectedLinks(tempUrls) {
-  const urls = tempUrls.slice(0, PARTNER_LINKS_DETECT_MAX);
-  return Promise.all(
-    urls.map(async (url) => {
-      const label = await fetchPartnerLinkTitle(url);
-      return { url, label };
-    })
-  );
+async function buildDetectedLinks(linkEntries) {
+  const entries = linkEntries.slice(0, PARTNER_LINKS_DETECT_MAX);
+  return Promise.all(entries.map((entry) => fetchPartnerLinkTitleWithContext(entry)));
 }
 
 function pickPrimaryPartnersUrl(detectedLinks) {
@@ -212,7 +208,7 @@ export async function GET(request) {
               
             const lines = description.split('\n');
             const urlRegex = /(https?:\/\/[^\s"'\\]+)/;
-            const tempUrls = [];
+            const tempLinks = [];
             
             for (let line of lines) {
               const match = line.match(urlRegex);
@@ -223,15 +219,15 @@ export async function GET(request) {
                   continue;
                 }
                 
-                pushUniqueUrl(tempUrls, url);
-                if (tempUrls.length >= PARTNER_LINKS_DETECT_MAX) {
+                pushUniqueLink(tempLinks, url, extractLinkContextLabel(line, url));
+                if (tempLinks.length >= PARTNER_LINKS_DETECT_MAX) {
                   break;
                 }
               }
             }
             
             // Only scan channel page when video description has no affiliate links
-            if (tempUrls.length === 0) {
+            if (tempLinks.length === 0) {
             try {
               const channelIdMatch = html.match(/"channelId"\s*:\s*"(UC[A-Za-z0-9_-]{22})"/i) ||
                                      html.match(/youtube\.com\/channel\/(UC[A-Za-z0-9_-]{22})/i);
@@ -265,8 +261,8 @@ export async function GET(request) {
                       continue;
                     }
                     
-                    pushUniqueUrl(tempUrls, resolvedUrl);
-                    if (tempUrls.length >= PARTNER_LINKS_DETECT_MAX) {
+                    pushUniqueLink(tempLinks, resolvedUrl);
+                    if (tempLinks.length >= PARTNER_LINKS_DETECT_MAX) {
                       break;
                     }
                   }
@@ -278,7 +274,7 @@ export async function GET(request) {
             }
             
             // Concurrently fetch page/browser titles for the links (up to PARTNER_LINKS_DETECT_MAX)
-            const detectedLinks = await buildDetectedLinks(tempUrls);
+            const detectedLinks = await buildDetectedLinks(tempLinks);
             
             // Set the primary partnersUrl using priority
             if (detectedLinks.length > 0) {
@@ -339,7 +335,7 @@ export async function GET(request) {
 
           if (profileRes.ok) {
             const profileHtml = await profileRes.text();
-            const tempUrls = [];
+            const tempLinks = [];
 
             // 1. Direct match for TikTok's native bioLink JSON property
             const bioLinkMatch = profileHtml.match(/"bioLink"\s*:\s*\{\s*"link"\s*:\s*"(.*?)"/);
@@ -349,7 +345,7 @@ export async function GET(request) {
                 const domain = new URL(cleanBioUrl).hostname.toLowerCase();
                 const systemKeywords = ['cdn', 'static', 'ttwstatic', 'secsdk', 'slardar', 'bytedance', 'ibytedtos'];
                 if (!systemKeywords.some(kw => domain.includes(kw))) {
-                  pushUniqueUrl(tempUrls, cleanBioUrl);
+                  pushUniqueLink(tempLinks, cleanBioUrl);
                 }
               } catch(e) {}
             } else {
@@ -357,15 +353,15 @@ export async function GET(request) {
               const rawUrls = profileHtml.match(/(https?:\/\/[^\s"'\\]+)/g) || [];
               for (let rawUrl of rawUrls) {
                 let cleanUrl = rawUrl.split(/[?"'\\]/)[0];
-                pushUniqueUrl(tempUrls, cleanUrl);
-                if (tempUrls.length >= PARTNER_LINKS_DETECT_MAX) {
+                pushUniqueLink(tempLinks, cleanUrl);
+                if (tempLinks.length >= PARTNER_LINKS_DETECT_MAX) {
                   break;
                 }
               }
             }
 
-            if (tempUrls.length > 0) {
-              detectedLinks = await buildDetectedLinks(tempUrls);
+            if (tempLinks.length > 0) {
+              detectedLinks = await buildDetectedLinks(tempLinks);
               partnersUrl = pickPrimaryPartnersUrl(detectedLinks);
             }
           }
@@ -454,7 +450,7 @@ export async function GET(request) {
           
           if (profileRes.ok) {
             const profileHtml = await profileRes.text();
-            const tempUrls = [];
+            const tempLinks = [];
 
             // 1. Direct match for Instagram's native external_url JSON property
             const extUrlMatch = profileHtml.match(/"external_url"\s*:\s*"(.*?)"/);
@@ -464,7 +460,7 @@ export async function GET(request) {
                 const domain = new URL(cleanExtUrl).hostname.toLowerCase();
                 const systemKeywords = ['cdn', 'static', 'ttwstatic', 'secsdk', 'slardar', 'bytedance', 'ibytedtos'];
                 if (!systemKeywords.some(kw => domain.includes(kw))) {
-                  pushUniqueUrl(tempUrls, cleanExtUrl);
+                  pushUniqueLink(tempLinks, cleanExtUrl);
                 }
               } catch(e) {}
             } else {
@@ -472,15 +468,15 @@ export async function GET(request) {
               const rawUrls = profileHtml.match(/(https?:\/\/[^\s"'\\]+)/g) || [];
               for (let rawUrl of rawUrls) {
                 let cleanUrl = rawUrl.split(/[?"'\\]/)[0];
-                pushUniqueUrl(tempUrls, cleanUrl);
-                if (tempUrls.length >= PARTNER_LINKS_DETECT_MAX) {
+                pushUniqueLink(tempLinks, cleanUrl);
+                if (tempLinks.length >= PARTNER_LINKS_DETECT_MAX) {
                   break;
                 }
               }
             }
             
-            if (tempUrls.length > 0) {
-              detectedLinks = await buildDetectedLinks(tempUrls);
+            if (tempLinks.length > 0) {
+              detectedLinks = await buildDetectedLinks(tempLinks);
               partnersUrl = pickPrimaryPartnersUrl(detectedLinks);
             }
           }

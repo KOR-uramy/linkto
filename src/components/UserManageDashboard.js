@@ -35,6 +35,7 @@ import {
   clampPartnerLinksForDisplay,
 } from '../config/partner-links';
 import PartnerLinkLabel from './PartnerLinkLabel';
+import { getPartnerLinkUrlFallback } from '../lib/partner-link-label';
 
 export default function UserManageDashboard() {
   const [user, setUser] = useState(null);
@@ -248,14 +249,13 @@ export default function UserManageDashboard() {
         if (metadata.detectedLinks?.length > 0) {
           detectedLinks = metadata.detectedLinks.slice(0, PARTNER_LINKS_DETECT_MAX).map((item) => ({
             url: item.url,
-            label: item.label || '구매 링크',
+            label: item.label || getPartnerLinkUrlFallback(item.url),
           }));
         } else if (metadata.partnersUrl) {
-          let label = '링크';
-          try {
-            label = new URL(metadata.partnersUrl).hostname.toLowerCase().replace(/^www\./i, '');
-          } catch (err) {}
-          detectedLinks = [{ url: metadata.partnersUrl, label }];
+          detectedLinks = [{
+            url: metadata.partnersUrl,
+            label: getPartnerLinkUrlFallback(metadata.partnersUrl),
+          }];
         }
 
         const { accepted, rejectedCount, detectedTotal } = acceptPartnerLinksForCard(detectedLinks);

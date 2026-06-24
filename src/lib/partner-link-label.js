@@ -7,25 +7,21 @@ function decodeBasicEntities(text) {
     .replace(/&#39;/g, "'");
 }
 
-export function getPartnerLinkFallbackLabel(url) {
-  try {
-    const hostname = new URL(url).hostname.toLowerCase();
-    if (hostname.includes('influencers.coupang.com')) {
-      return '쿠팡 스토어프론트';
-    }
-    if (hostname.includes('link.coupang.com')) {
-      return '쿠팡에서 보기';
-    }
-    if (hostname.includes('coupang.com')) {
-      return '쿠팡';
-    }
-    if (hostname.includes('smartstore.naver.com') || hostname.includes('brand.naver.com')) {
-      return '네이버 스마트스토어';
-    }
-    return hostname.replace(/^www\./i, '');
-  } catch {
-    return '구매 링크';
+function isLegacyPlaceholderLabel(label) {
+  const normalized = label?.trim();
+  if (!normalized) {
+    return false;
   }
+
+  // 예전 자동 생성 CTA 문구 — 실제 fetch/설명 데이터가 있으면 무시
+  return [
+    '쿠팡에서 보기',
+    '쿠팡 스토어프론트',
+    '쿠팡',
+    '네이버 스마트스토어',
+    '구매 링크',
+    '링크',
+  ].includes(normalized);
 }
 
 function isWeakSlugLabel(label, url) {
@@ -52,35 +48,25 @@ function isWeakSlugLabel(label, url) {
   return false;
 }
 
-/** HTML title·og:title 등을 CTA 버튼용 짧은 라벨로 정리합니다. */
-export function cleanPartnerLinkLabel(title, url) {
-  const fallback = getPartnerLinkFallbackLabel(url);
-  if (!title?.trim()) {
-    return fallback;
-  }
-
-  let cleaned = decodeBasicEntities(title.trim());
-
-  const pipeMatch = cleaned.match(/^(.+?)\s*\|\s*(.+)$/);
-  if (pipeMatch) {
-    const prefix = pipeMatch[1].trim();
-    const suffix = pipeMatch[2].trim();
-    // "ddubi_home_ | 쿠팡 스토어프론트" → 뒷부분(사이트/매장명) 사용
-    if (/^[\w@.-]+$/.test(prefix) && suffix) {
-      cleaned = suffix;
-    } else {
-      cleaned = prefix;
-    }
-  }
-
-  cleaned = cleaned
+function stripSiteSuffix(title) {
+  return title
     .replace(/\s*-\s*쿠팡!$/i, '')
     .replace(/\s*:\s*네이버\s*쇼핑$/i, '')
     .replace(/\s*:\s*네이버\s*스마트스토어$/i, '')
     .trim();
+}
 
-  if (!cleaned || isWeakSlugLabel(cleaned, url)) {
-    return fallback;
+/** 실제 페이지/설명에서 가져온 타이틀을 CTA 버튼용 라벨로 정리합니다. */
+export function cleanPartnerLinkLabel(title, url) {
+  if (!title?.trim()) {
+    return '';
+  }
+
+  let cleaned = decodeBasicEntities(title.trim());
+  cleaned = stripSiteSuffix(cleaned);
+
+  if (!cleaned || isWeakSlugLabel(cleaned, url) || isLegacyPlaceholderLabel(cleaned)) {
+    return '';
   }
 
   return cleaned;
@@ -90,17 +76,20 @@ export function isWeakPartnerLinkLabel(label, url) {
   return isWeakSlugLabel(label, url);
 }
 
-export function getInitialPartnerLinkLabel(storedLabel, url) {
-  const fallback = getPartnerLinkFallbackLabel(url);
-  const cleaned = cleanPartnerLinkLabel(storedLabel || '', url);
+/** 저장·fetch·설명 맥락 중 표시할 최적 라벨을 고릅니다. */
+export function resolvePartnerLinkDisplayLabel(storedLabel, url, fetchedLabel = '', contextLabel = '') {
+  const candidates = [fetchedLabel, storedLabel, contextLabel]
+    .map((label) => cleanPartnerLinkLabel(label, url))
+    .filter(Boolean);
 
-  if (cleaned && cleaned !== fallback && !isWeakSlugLabel(cleaned, url)) {
-    return cleaned;
-  }
-
-  return fallback;
+  return candidates[0] || '';
 }
 
-export function resolvePartnerLinkDisplayLabel(storedLabel, url) {
-  return getInitialPartnerLinkLabel(storedLabel, url);
+export function getInitialPartnerLinkLabel(storedLabel, url, contextLabel = '') {
+  return resolvePartnerLinkDisplayLabel(storedLabel, url, '', contextLabel);
+}
+
+/** fetch 실패 시 표시할 URL 주소 */
+export function getPartnerLinkUrlFallback(url) {
+  return url?.trim() || '';
 }
