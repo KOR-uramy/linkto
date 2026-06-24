@@ -384,12 +384,6 @@
   color: #ef4444;
 }
 
-/* Sync Section */
-.sync-section {
-  padding: 24px;
-  border-radius: 20px 15px 220px 15px/15px 220px 15px 20px;
-}
-
 .sync-description {
   font-size: 14px;
   color: var(--text-secondary);
@@ -397,47 +391,15 @@
   margin-bottom: 16px;
 }
 
-.sync-actions-row {
+/* Login gate (admin requires auth) */
+.login-gate {
+  padding: 32px 24px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-@media (min-width: 480px) {
-  .sync-actions-row {
-    flex-direction: row;
-  }
-  .sync-actions-row button {
-    flex: 1;
-  }
-}
-
-/* Guest Info Banner */
-.guest-banner {
-  padding: 20px;
-  background: var(--highlight-yellow);
-  border: 2px dashed var(--stroke-color);
-  border-radius: 12px;
-  margin-bottom: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  box-shadow: 3px 3px 0px var(--stroke-color);
-}
-
-.guest-banner-text {
-  font-size: 14px;
-  color: var(--text-primary);
-  line-height: 1.6;
-  font-family: var(--font-handwritten);
-  font-weight: 700;
-}
-
-.guest-banner-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
   align-items: center;
+  gap: 16px;
+  max-width: 360px;
+  margin: 0 auto;
 }
 
 /* User Profile Widget in Admin */
@@ -560,4 +522,24 @@
   font-family: var(--font-handwritten);
   font-size: 14px;
   color: var(--text-secondary);
+}
+
+.loading-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40vh;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(0, 0, 0, 0.05);
+  border-radius: 50%;
+  border-top-color: var(--stroke-color);
+  animation: admin-spin 1s linear infinite;
+}
+
+@keyframes admin-spin {
+  to { transform: rotate(360deg); }
 }

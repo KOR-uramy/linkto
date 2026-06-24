@@ -1,48 +1,39 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { sanitizeUserId } from '../../../lib/db/connection.js';
+import { saveUserData } from '../../../lib/db/user-repository.js';
+import { authErrorResponse, verifyRequestUser } from '../../../lib/auth/verify-api-request.js';
 
 export async function POST(request) {
   try {
     const payload = await request.json();
-    const { userId, data } = payload;
+    const { data, credential } = payload;
 
-    // Basic format validation
     if (!data || !data.profile || !data.links) {
       return NextResponse.json({ error: 'Invalid data format' }, { status: 400 });
     }
 
-    let filePath;
-    let message;
-    if (!userId || userId === 'guest') {
-       // Default fallback to global links.json
-      filePath = path.join(process.cwd(), 'src', 'data', 'links.json');
-      message = 'Saved successfully to global links.json';
-    } else {
-      // Clean userId to prevent path traversal
-      const cleanUserId = userId.replace(/[^a-zA-Z0-9_-]/g, '');
-      if (!cleanUserId) {
-        return NextResponse.json({ error: 'Invalid userId format' }, { status: 400 });
-      }
-      const userDir = path.join(process.cwd(), 'src', 'data', 'users');
-      filePath = path.join(userDir, `${cleanUserId}.json`);
-
-      // Ensure directory exists
-      if (!fs.existsSync(userDir)) {
-        fs.mkdirSync(userDir, { recursive: true });
-      }
-      message = `Saved successfully to users/${cleanUserId}.json`;
+    const user = await verifyRequestUser(request, { credential });
+    const userId = sanitizeUserId(user.sub);
+    if (!userId) {
+      return NextResponse.json({ error: 'Invalid user identity' }, { status: 400 });
     }
 
-    // Write file to the local directory
-    await fs.promises.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
+    const saved = saveUserData(userId, data);
 
-    return NextResponse.json({ success: true, message });
+    return NextResponse.json({
+      success: true,
+      message: 'Saved successfully',
+      slug: saved.slug,
+    });
   } catch (error) {
+    if (error.status === 401 || error.status === 403) {
+      return authErrorResponse(error);
+    }
+
     console.error('Failed to save links configuration:', error);
     return NextResponse.json(
-      { error: 'Failed to write configuration file locally', details: error.message },
-      { status: 500 }
+      { error: error.message || 'Failed to save configuration', code: error.code || 'SAVE_FAILED' },
+      { status: 400 }
     );
   }
 }

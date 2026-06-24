@@ -1,20 +1,30 @@
 'use client';
 
 import './page.css';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { LogOut, LayoutDashboard, Link2, ExternalLink, Copy, Check } from 'lucide-react';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import { signInWithGoogleCredential, getStoredUser, signOutUser } from '../lib/auth/google-sign-in';
-import { getPublicAppUrl } from '../config/app';
+import { useUserSlug } from '../hooks/use-user-slug';
 
 export default function Home() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [urlCopied, setUrlCopied] = useState(false);
 
+  const handleAuthExpired = useCallback(() => {
+    signOutUser();
+    setUser(null);
+  }, []);
+
+  const { effectiveSlug, publicPath, publicUrl } = useUserSlug(user, {
+    syncFromApi: true,
+    onAuthExpired: handleAuthExpired,
+  });
+
   useEffect(() => {
-    document.title = "LinkTo - 나만의 링크보드";
+    document.title = 'LinkTo - 나만의 링크보드';
   }, []);
 
   const handleCredentialResponse = async (response) => {
@@ -27,21 +37,6 @@ export default function Home() {
     }
   };
 
-  const handleMockLogin = async () => {
-    const mockUser = {
-      sub: 'mock-user-123',
-      name: '개발자 테스트',
-      email: 'developer@linkto.com',
-      picture: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100%" height="100%" fill="%23ffd54f"/><text x="50%" y="55%" font-size="36" font-family="sans-serif" font-weight="bold" fill="%232c2c2c" dominant-baseline="middle" text-anchor="middle">DEV</text></svg>'
-    };
-    
-    localStorage.setItem('linkto_user', JSON.stringify(mockUser));
-    setUser(mockUser);
-    
-    // Pre-create/load profile on backend
-    await fetch(`/api/load?userId=${mockUser.sub}&name=${encodeURIComponent(mockUser.name)}&picture=${encodeURIComponent(mockUser.picture)}`);
-  };
-
   const handleLogout = () => {
     signOutUser();
     setUser(null);
@@ -50,7 +45,9 @@ export default function Home() {
   useEffect(() => {
     try {
       const savedUser = getStoredUser();
-      if (savedUser) setUser(savedUser);
+      if (savedUser) {
+        setUser(savedUser);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -77,9 +74,9 @@ export default function Home() {
         {!user ? (
           <div className="auth-section">
             <div className="sketch-notebook-art">
-              <div className="art-line">✏️ 유튜브/SNS 링크만 복사 붙여넣기 하면 끝!</div>
+              <div className="art-line">✏️ 유튜브·인스타그램·틱톡 링크만 복사 붙여넣기 하면 끝!</div>
               <div className="art-line">🎨 아날로그 드로잉 노트 감성의 미려한 디자인</div>
-              <div className="art-line">🔗 나만의 전용 URL (`/[구글유저ID]`) 발급</div>
+              <div className="art-line">🔗 나만의 전용 URL 발급</div>
               <div className="art-line">📈 실시간 클릭수 통계 제공</div>
             </div>
 
@@ -88,19 +85,7 @@ export default function Home() {
                 containerId="google-signin-btn-home"
                 onCredential={handleCredentialResponse}
               />
-              
-              {/* Mock Developer Login */}
-              <button onClick={handleMockLogin} className="btn-secondary mock-login-btn">
-                <span>Mock 계정으로 시작하기 (개발용)</span>
-              </button>
 
-              <div className="login-divider">또는</div>
-
-              {/* Guest Access Button */}
-              <Link href="/admin" className="btn-primary start-guest-btn">
-                <span>로그인 없이 바로 만들기</span>
-              </Link>
-              
               <p className="login-notice">
                 * 구글 로그인 시 고유 유저 ID 기반의 개인화 주소가 즉시 생성됩니다.
               </p>
@@ -121,24 +106,30 @@ export default function Home() {
             </div>
 
             <div className="portal-actions">
-              <Link href="/admin" className="btn-primary portal-btn">
+              <Link href="/manage" className="btn-primary portal-btn">
                 <LayoutDashboard size={18} />
-                <span>관리자 대시보드 (편집하기)</span>
+                <span>내 페이지 관리 (편집하기)</span>
               </Link>
 
-              <Link href={`/${user.sub}`} className="btn-secondary portal-btn" target="_blank">
+              <Link
+                href={publicPath}
+                className="btn-secondary portal-btn portal-btn--view"
+                target="_blank"
+                aria-disabled={!effectiveSlug}
+                style={!effectiveSlug ? { pointerEvents: 'none', opacity: 0.5 } : undefined}
+              >
                 <Link2 size={18} />
                 <span>나의 공개 링크 페이지 보기</span>
-                <ExternalLink size={14} style={{ marginLeft: 'auto' }} />
+                <ExternalLink size={14} />
               </Link>
-              
+
               <div className="user-url-display" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <span className="url-label">내 링크 주소:</span>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <code className="url-code" style={{ flex: 1 }}>{`${getPublicAppUrl()}/${user.sub}`}</code>
-                  <button 
+                  <code className="url-code" style={{ flex: 1 }}>{publicUrl}</code>
+                  <button
                     onClick={() => {
-                      navigator.clipboard.writeText(`${getPublicAppUrl()}/${user.sub}`);
+                      navigator.clipboard.writeText(publicUrl);
                       setUrlCopied(true);
                       setTimeout(() => setUrlCopied(false), 2000);
                     }}

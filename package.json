@@ -5,10 +5,14 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:static": "node scripts/build-static.mjs",
+    "db:migrate": "node scripts/migrate-json-to-sqlite.mjs",
+    "db:backfill-slugs": "node scripts/backfill-slugs.mjs",
     "start": "next start -H 0.0.0.0 -p 3003",
     "lint": "eslint"
   },
   "dependencies": {
+    "better-sqlite3": "^12.11.1",
     "google-auth-library": "^10.7.0",
     "lucide-react": "^1.21.0",
     "next": "16.2.9",

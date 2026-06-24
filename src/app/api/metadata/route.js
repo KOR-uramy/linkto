@@ -49,6 +49,45 @@ function isJunkDomain(url) {
   return false;
 }
 
+const YOUTUBE_FETCH_HEADERS = {
+  'User-Agent':
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+};
+
+async function fetchYouTubePageHtml(videoId, preferShorts = false) {
+  const candidates = preferShorts
+    ? [
+        `https://www.youtube.com/shorts/${videoId}`,
+        `https://www.youtube.com/watch?v=${videoId}`,
+      ]
+    : [
+        `https://www.youtube.com/watch?v=${videoId}`,
+        `https://www.youtube.com/shorts/${videoId}`,
+      ];
+
+  for (const pageUrl of candidates) {
+    try {
+      const res = await fetch(pageUrl, {
+        headers: YOUTUBE_FETCH_HEADERS,
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) {
+        continue;
+      }
+
+      const html = await res.text();
+      if (html.includes('shortDescription') || /og:title/i.test(html)) {
+        return html;
+      }
+    } catch {
+      // try the alternate YouTube page URL
+    }
+  }
+
+  return '';
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const targetUrl = searchParams.get('url');
@@ -76,18 +115,10 @@ export async function GET(request) {
       let partnersUrl = '';
       
       try {
-        // Fetch watch page HTML to extract title, description, and affiliate links
-        const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
-        const watchRes = await fetch(watchUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
-            'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
-          }
-        });
-        
-        if (watchRes.ok) {
-          const html = await watchRes.text();
-          
+        const isShortsUrl = /youtube\.com\/shorts\//i.test(cleanUrl);
+        const html = await fetchYouTubePageHtml(videoId, isShortsUrl);
+
+        if (html) {
           // Parse video title from HTML
           const ogTitleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i) ||
                                html.match(/<meta\s+name=["']twitter:title["']\s+content=["'](.*?)["']/i) ||
@@ -158,11 +189,8 @@ export async function GET(request) {
                 const channelId = channelIdMatch[1];
                 const channelUrl = `https://www.youtube.com/channel/${channelId}`;
                 const channelRes = await fetch(channelUrl, {
-                  headers: {
-                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
-                    'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
-                  },
-                  signal: AbortSignal.timeout(3000)
+                  headers: YOUTUBE_FETCH_HEADERS,
+                  signal: AbortSignal.timeout(3000),
                 });
                 
                 if (channelRes.ok) {

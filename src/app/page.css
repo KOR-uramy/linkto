@@ -68,15 +68,6 @@
   align-items: center;
 }
 
-.mock-login-btn {
-  width: 100%;
-  max-width: 280px;
-  font-size: 15px !important;
-  font-family: var(--font-standard) !important;
-  padding: 10px 20px !important;
-  border-radius: 8px !important;
-}
-
 .login-notice {
   font-size: 11px;
   color: var(--text-secondary);
@@ -148,6 +139,12 @@
   font-size: 15px !important;
   font-family: var(--font-standard) !important;
   border-radius: 12px !important;
+  justify-content: center !important;
+  text-decoration: none;
+}
+
+.portal-btn--view {
+  gap: 8px;
 }
 
 .user-url-display {
@@ -209,31 +206,6 @@
   border-radius: 50%;
   border-top-color: var(--stroke-color);
   animation: spin 1s linear infinite;
-}
-
-.login-divider {
-  font-family: var(--font-handwritten);
-  font-size: 16px;
-  color: var(--text-secondary);
-  margin: 4px 0;
-  position: relative;
-  width: 100%;
-  text-align: center;
-}
-
-.start-guest-btn {
-  width: 100%;
-  max-width: 280px;
-  height: auto;
-  font-size: 15px !important;
-  font-family: var(--font-standard) !important;
-  padding: 10px 20px !important;
-  border-radius: 8px !important;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
 }
 
 @keyframes spin {

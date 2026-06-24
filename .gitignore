@@ -34,6 +34,17 @@ yarn-error.log*
 .env*
 !.env.example
 
+# Google OAuth credentials
+/secrets/
+
+# SQLite database (production data on EC2)
+/data/*.db
+/data/*.db-wal
+/data/*.db-shm
+
+# static build temp
+.static-build/
+
 # vercel
 .vercel
 

@@ -1,64 +1,44 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { sanitizeUserId } from '../../../lib/db/connection.js';
+import { loadOrCreateUser, resolvePublicHandle } from '../../../lib/db/user-repository.js';
+import { authErrorResponse, verifyRequestUser } from '../../../lib/auth/verify-api-request.js';
+
+function toPublicPayload(data) {
+  const { id, ...publicData } = data;
+  return publicData;
+}
 
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
-    const name = searchParams.get('name') || '';
-    const picture = searchParams.get('picture') || '';
+    const handle = searchParams.get('handle');
 
-    let filePath;
-    if (!userId || userId === 'guest') {
-      // Default fallback to the global links.json
-      filePath = path.join(process.cwd(), 'src', 'data', 'links.json');
-    } else {
-      // Clean userId to prevent path traversal
-      const cleanUserId = userId.replace(/[^a-zA-Z0-9_-]/g, '');
-      if (!cleanUserId) {
-        return NextResponse.json({ error: 'Invalid userId format' }, { status: 400 });
+    if (handle) {
+      const data = resolvePublicHandle(handle);
+      if (!data) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
       }
-      const userDir = path.join(process.cwd(), 'src', 'data', 'users');
-      filePath = path.join(userDir, `${cleanUserId}.json`);
-
-      // Ensure directory exists
-      if (!fs.existsSync(userDir)) {
-        fs.mkdirSync(userDir, { recursive: true });
-      }
+      return NextResponse.json(toPublicPayload(data));
     }
 
-    // Check if user configuration file exists
-    if (fs.existsSync(filePath)) {
-      const fileData = await fs.promises.readFile(filePath, 'utf-8');
-      return NextResponse.json(JSON.parse(fileData));
+    const user = await verifyRequestUser(request);
+    const userId = sanitizeUserId(user.sub);
+    if (!userId) {
+      return NextResponse.json({ error: 'Invalid user identity' }, { status: 400 });
     }
 
-    // If it doesn't exist, initialize a default configuration
-    const defaultData = {
-      profile: {
-        name: name || "My LinkTo",
-        bio: "유튜브 / SNS 영상 링크와 제휴사 링크를 보기 쉽게 모아두는 나만의 링크 보드입니다.",
-        avatar: picture || "",
-        socials: {
-          youtube: "",
-          instagram: "",
-          tiktok: "",
-          blog: "",
-          email: ""
-        }
-      },
-      links: []
-    };
-
-    // Save default configuration
-    await fs.promises.writeFile(filePath, JSON.stringify(defaultData, null, 2), 'utf-8');
-
-    return NextResponse.json(defaultData);
+    const name = searchParams.get('name') || user.name || '';
+    const picture = searchParams.get('picture') || user.picture || '';
+    const data = loadOrCreateUser(userId, { name, picture });
+    return NextResponse.json(data);
   } catch (error) {
+    if (error.status === 401 || error.status === 403) {
+      return authErrorResponse(error);
+    }
+
     console.error('Failed to load user configuration:', error);
     return NextResponse.json(
-      { error: 'Failed to load configuration file', details: error.message },
+      { error: 'Failed to load configuration', details: error.message },
       { status: 500 }
     );
   }
