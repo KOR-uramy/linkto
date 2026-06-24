@@ -24,6 +24,7 @@ import {
 import initialData from '../../data/links.json';
 import GoogleSignInButton from '../../components/GoogleSignInButton';
 import { signInWithGoogleCredential, getStoredUser, signOutUser } from '../../lib/auth/google-sign-in';
+import { getPublicAppUrl } from '../../config/app';
 
 export default function Admin() {
   const [user, setUser] = useState(null);
@@ -448,10 +449,10 @@ export default function Admin() {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', borderTop: '1px dashed var(--stroke-color)', paddingTop: '10px', marginTop: '-6px', flexWrap: 'wrap' }}>
               <span style={{ fontWeight: 'bold' }}>임시 주소:</span>
-              <code style={{ background: 'rgba(0,0,0,0.04)', padding: '2px 6px', borderRadius: '4px', fontFamily: 'monospace' }}>http://localhost:3000/guest</code>
+              <code style={{ background: 'rgba(0,0,0,0.04)', padding: '2px 6px', borderRadius: '4px', fontFamily: 'monospace' }}>{`${getPublicAppUrl()}/guest`}</code>
               <button 
                 onClick={() => {
-                  navigator.clipboard.writeText('http://localhost:3000/guest');
+                  navigator.clipboard.writeText(`${getPublicAppUrl()}/guest`);
                   setUrlCopied(true);
                   setTimeout(() => setUrlCopied(false), 2000);
                 }}
@@ -511,12 +512,12 @@ export default function Admin() {
                   <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>|</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <code style={{ fontSize: '11px', background: 'rgba(0,0,0,0.04)', padding: '2px 4px', borderRadius: '4px', fontFamily: 'monospace' }}>
-                      {`http://localhost:3000/${user.sub}`}
+                      {`${getPublicAppUrl()}/${user.sub}`}
                     </code>
                     <button
                       type="button"
                       onClick={() => {
-                        navigator.clipboard.writeText(`http://localhost:3000/${user.sub}`);
+                        navigator.clipboard.writeText(`${getPublicAppUrl()}/${user.sub}`);
                         setUrlCopied(true);
                         setTimeout(() => setUrlCopied(false), 2000);
                       }}

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { LogOut, LayoutDashboard, Link2, ExternalLink, Copy, Check } from 'lucide-react';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import { signInWithGoogleCredential, getStoredUser, signOutUser } from '../lib/auth/google-sign-in';
+import { getPublicAppUrl } from '../config/app';
 
 export default function Home() {
   const [user, setUser] = useState(null);
@@ -134,10 +135,10 @@ export default function Home() {
               <div className="user-url-display" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <span className="url-label">내 링크 주소:</span>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <code className="url-code" style={{ flex: 1 }}>{`http://localhost:3000/${user.sub}`}</code>
+                  <code className="url-code" style={{ flex: 1 }}>{`${getPublicAppUrl()}/${user.sub}`}</code>
                   <button 
                     onClick={() => {
-                      navigator.clipboard.writeText(`http://localhost:3000/${user.sub}`);
+                      navigator.clipboard.writeText(`${getPublicAppUrl()}/${user.sub}`);
                       setUrlCopied(true);
                       setTimeout(() => setUrlCopied(false), 2000);
                     }}
