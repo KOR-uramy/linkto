@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { apiUrl } from '../lib/api';
-import { getInitialPartnerLinkLabel } from '../lib/partner-link-label';
+import {
+  cleanPartnerLinkLabel,
+  getInitialPartnerLinkLabel,
+  getPartnerLinkFallbackLabel,
+} from '../lib/partner-link-label';
 
 export default function PartnerLinkLabel({ url, storedLabel, className = '' }) {
   const [label, setLabel] = useState(() => getInitialPartnerLinkLabel(storedLabel, url));
@@ -25,8 +29,9 @@ export default function PartnerLinkLabel({ url, storedLabel, className = '' }) {
         }
 
         const data = await res.json();
-        const fetched = data.title?.trim();
-        if (!cancelled && fetched) {
+        const fetched = cleanPartnerLinkLabel(data.title, url);
+        const fallback = getPartnerLinkFallbackLabel(url);
+        if (!cancelled && fetched && fetched !== fallback) {
           setLabel(fetched);
         }
       } catch {

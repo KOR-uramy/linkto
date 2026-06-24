@@ -32,6 +32,24 @@ function extractRawTitle(html) {
   );
 }
 
+/** influencers.coupang.com 스토어프론트 HTML에 포함된 크리에이터 매장명 */
+function extractStorefrontProfileTitle(html) {
+  const patterns = [
+    /"profile"\s*:\s*\{[^}]*"title"\s*:\s*"([^"]+)"/,
+    /\\"profile\\":\{[^}]*\\"title\\":\\"([^\\"]+)\\"/,
+    /storefrontNo\\":\\"[^\\"]+\\"[^}]*\\"title\\":\\"([^\\"]+)\\"/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match?.[1]) {
+      return match[1].trim();
+    }
+  }
+
+  return '';
+}
+
 /** 제휴 URL의 브라우저 탭 타이틀을 가져옵니다. */
 export async function fetchPartnerLinkTitle(url) {
   if (!url) {
@@ -47,6 +65,14 @@ export async function fetchPartnerLinkTitle(url) {
 
     if (response.ok) {
       const html = await response.text();
+
+      if (/influencers\.coupang\.com/i.test(url)) {
+        const profileTitle = extractStorefrontProfileTitle(html);
+        if (profileTitle) {
+          return cleanPartnerLinkLabel(profileTitle, url);
+        }
+      }
+
       const rawTitle = extractRawTitle(html);
       if (rawTitle) {
         return cleanPartnerLinkLabel(rawTitle, url);
